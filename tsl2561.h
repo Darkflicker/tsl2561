@@ -145,6 +145,7 @@ esp_err_t tsl2561_set_gain(tsl2561_t *dev, tsl2561_gain_t gain);
  * @return `ESP_OK` on success
  */
 esp_err_t tsl2561_read_lux(tsl2561_t *dev, uint32_t *lux);
+esp_err_t tsl2561_read_lux_float(tsl2561_t *dev, float *lux);
 
 #ifdef __cplusplus
 }
