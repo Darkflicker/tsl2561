@@ -442,3 +442,79 @@ esp_err_t tsl2561_read_lux(tsl2561_t *dev, uint32_t *lux)
 
     return ESP_OK;
 }
+
+esp_err_t tsl2561_read_lux_float(tsl2561_t *dev, float *lux)
+{
+    CHECK_ARG(dev && lux);
+
+    uint32_t ch_scale, channel0, channel1;
+
+    switch (dev->integration_time)
+    {
+        case TSL2561_INTEGRATION_13MS:
+            ch_scale = CHSCALE_TINT0;
+            break;
+        case TSL2561_INTEGRATION_101MS:
+            ch_scale = CHSCALE_TINT1;
+            break;
+        default:
+            ch_scale = (1 << CH_SCALE);
+            break;
+    }
+
+    if (dev->gain == TSL2561_GAIN_1X)
+        ch_scale <<= 4;
+
+    uint16_t ch0 = 0, ch1 = 0;
+    CHECK(get_channel_data(dev, &ch0, &ch1));
+
+    channel0 = (ch0 * ch_scale) >> CH_SCALE;
+    channel1 = (ch1 * ch_scale) >> CH_SCALE;
+
+    uint32_t ratio = 0;
+    if (channel0 != 0)
+    {
+        uint32_t ratio1 = (channel1 << (RATIO_SCALE + 1)) / channel0;
+        ratio = (ratio1 + 1) >> 1;
+    }
+
+    uint32_t b = 0, m = 0;
+
+    switch (dev->package_type)
+    {
+        case TSL2561_PACKAGE_CS:
+            if (ratio <= K1C)      { b = B1C; m = M1C; }
+            else if (ratio <= K2C) { b = B2C; m = M2C; }
+            else if (ratio <= K3C) { b = B3C; m = M3C; }
+            else if (ratio <= K4C) { b = B4C; m = M4C; }
+            else if (ratio <= K5C) { b = B5C; m = M5C; }
+            else if (ratio <= K6C) { b = B6C; m = M6C; }
+            else if (ratio <= K7C) { b = B7C; m = M7C; }
+            else                   { b = B8C; m = M8C; }
+            break;
+
+        case TSL2561_PACKAGE_T_FN_CL:
+            if (ratio <= K1T)      { b = B1T; m = M1T; }
+            else if (ratio <= K2T) { b = B2T; m = M2T; }
+            else if (ratio <= K3T) { b = B3T; m = M3T; }
+            else if (ratio <= K4T) { b = B4T; m = M4T; }
+            else if (ratio <= K5T) { b = B5T; m = M5T; }
+            else if (ratio <= K6T) { b = B6T; m = M6T; }
+            else if (ratio <= K7T) { b = B7T; m = M7T; }
+            else                   { b = B8T; m = M8T; }
+            break;
+
+        default:
+            ESP_LOGE(TAG, "Invalid package type");
+            return ESP_ERR_NOT_SUPPORTED;
+    }
+
+    int32_t temp = (channel0 * b) - (channel1 * m);
+
+    if (temp < 0)
+        temp = 0;
+
+    *lux = (float)temp / (float)(1 << LUX_SCALE);
+
+    return ESP_OK;
+}
